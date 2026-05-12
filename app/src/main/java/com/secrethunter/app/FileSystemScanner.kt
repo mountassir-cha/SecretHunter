@@ -12,10 +12,12 @@ import androidx.core.content.ContextCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayInputStream
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.charset.CodingErrorAction
 import java.nio.charset.StandardCharsets
+import java.util.zip.ZipInputStream
 import kotlin.coroutines.coroutineContext
 
 object FileSystemScanner {
@@ -31,6 +33,8 @@ object FileSystemScanner {
         "jpg", "jpeg", "png", "webp", "gif", "heic", "bmp",
     )
 
+    private val ARCHIVE_EXTENSIONS = setOf("apk", "zip")
+
     suspend fun scan(
         context: Context,
         detector: RegexDetector,
@@ -40,25 +44,9 @@ object FileSystemScanner {
         val all = ArrayList<Secret>()
         val seenFiles = LinkedHashSet<String>()
 
-        fun scanText(label: String, text: String) {
-            coroutineContext.ensureActive()
-            if (text.isEmpty()) return
-            text.lineSequence().forEachIndexed { idx, line ->
-                all.addAll(detector.matchLine(line, idx + 1, label, now))
-            }
-        }
-
         fun scanBytes(label: String, bytes: ByteArray) {
-            val slice = if (bytes.size > MAX_BYTES) bytes.copyOf(MAX_BYTES) else bytes
-            val decoder = StandardCharsets.UTF_8.newDecoder()
-                .onMalformedInput(CodingErrorAction.REPLACE)
-                .onUnmappableCharacter(CodingErrorAction.REPLACE)
-            val text = try {
-                decoder.decode(ByteBuffer.wrap(slice)).toString()
-            } catch (_: Exception) {
-                String(slice, Charsets.ISO_8859_1)
-            }
-            scanText(label, text)
+            val text = decodeBytesToText(bytes)
+            scanTextLines(label, text, detector, now, all)
         }
 
         fun offerFile(file: File) {
@@ -66,13 +54,17 @@ object FileSystemScanner {
             val key = file.absolutePath
             if (!seenFiles.add(key)) return
             val ext = file.extension.lowercase()
-            if (ext !in TEXT_EXTENSIONS && ext !in IMAGE_EXTENSIONS) return
+            if (ext !in TEXT_EXTENSIONS && ext !in IMAGE_EXTENSIONS && ext !in ARCHIVE_EXTENSIONS) return
             if (file.length() > MAX_BYTES * 4L) return
             onStatus(file.name)
             coroutineContext.ensureActive()
             runCatching {
                 val bytes = file.readBytes()
-                scanBytes(key, bytes)
+                if (ext in ARCHIVE_EXTENSIONS) {
+                    scanArchive(key, bytes, detector, now, all)
+                } else {
+                    scanBytes(key, bytes)
+                }
             }
         }
 
@@ -110,8 +102,12 @@ object FileSystemScanner {
         // Téléchargements : ne pas exiger READ_MEDIA_* (images/vidéos) — sur Android 13+ ces droits
         // ne couvrent pas les .txt ; une requête directe peut quand même retourner des fichiers indexés.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            queryMediaStoreDownloadsUnrestricted(context, onStatus) { label, bytes ->
-                scanBytes(label, bytes)
+            queryMediaStoreDownloadsUnrestricted(context, onStatus) { label, bytes, ext ->
+                if (ext in ARCHIVE_EXTENSIONS) {
+                    scanArchive(label, bytes, detector, now, all)
+                } else {
+                    scanBytes(label, bytes)
+                }
             }
         }
 
@@ -156,21 +152,84 @@ object FileSystemScanner {
     ): List<Secret>? = withContext(Dispatchers.IO) {
         val now = System.currentTimeMillis()
         val bytes = readUri(context, uri) ?: return@withContext null
+        val label = resolveDisplayName(context, uri)
+        val ext = label.substringAfterLast('.', "").lowercase()
+        val mimeType = context.contentResolver.getType(uri)
+        val isArchive = ext in ARCHIVE_EXTENSIONS || mimeType == "application/vnd.android.package-archive" || mimeType == "application/zip"
+        val out = ArrayList<Secret>()
+        
+        android.util.Log.d("SecretHunter", "scanContentUri: label=$label, ext=$ext, mimeType=$mimeType, isArchive=$isArchive, size=${bytes.size}")
+
+        if (isArchive) {
+            scanArchive(label, bytes, detector, now, out)
+        } else {
+            val text = decodeBytesToText(bytes)
+            scanTextLines(label, text, detector, now, out)
+        }
+        out
+    }
+
+    private fun scanTextLines(
+        label: String,
+        text: String,
+        detector: RegexDetector,
+        now: Long,
+        out: MutableList<Secret>
+    ) {
+        if (text.isEmpty()) return
+        text.lineSequence().forEachIndexed { idx, line ->
+            out.addAll(detector.matchLine(line, idx + 1, label, now))
+        }
+    }
+
+    private fun decodeBytesToText(bytes: ByteArray): String {
         val slice = if (bytes.size > MAX_BYTES) bytes.copyOf(MAX_BYTES) else bytes
         val decoder = StandardCharsets.UTF_8.newDecoder()
             .onMalformedInput(CodingErrorAction.REPLACE)
             .onUnmappableCharacter(CodingErrorAction.REPLACE)
-        val text = try {
+        return try {
             decoder.decode(ByteBuffer.wrap(slice)).toString()
         } catch (_: Exception) {
             String(slice, Charsets.ISO_8859_1)
         }
-        val label = resolveDisplayName(context, uri)
-        val out = ArrayList<Secret>()
-        text.lineSequence().forEachIndexed { idx, line ->
-            out.addAll(detector.matchLine(line, idx + 1, label, now))
+    }
+
+    private fun scanArchive(
+        label: String,
+        bytes: ByteArray,
+        detector: RegexDetector,
+        now: Long,
+        out: MutableList<Secret>
+    ) {
+        runCatching {
+            ZipInputStream(ByteArrayInputStream(bytes)).use { zis ->
+                while (true) {
+                    val entry = zis.nextEntry ?: break
+                    if (entry.isDirectory) continue
+                    val ext = entry.name.substringAfterLast('.', "").lowercase()
+                    val isText = ext in TEXT_EXTENSIONS || entry.name == "AndroidManifest.xml" || entry.name.endsWith(".dex")
+                    if (!isText && !entry.name.contains("assets/")) continue
+                    
+                    val buf = ByteArrayOutputStreamCompat()
+                    val tmp = ByteArray(8192)
+                    var total = 0
+                    while (true) {
+                        val n = zis.read(tmp)
+                        if (n <= 0) break
+                        total += n
+                        if (total > MAX_BYTES) {
+                            buf.write(tmp, 0, n - (total - MAX_BYTES))
+                            break
+                        }
+                        buf.write(tmp, 0, n)
+                    }
+                    val text = decodeBytesToText(buf.toByteArray())
+                    scanTextLines("$label -> ${entry.name}", text, detector, now, out)
+                }
+            }
+        }.onFailure { 
+            android.util.Log.e("SecretHunter", "Failed to scan archive", it)
         }
-        out
     }
 
     private fun resolveDisplayName(context: Context, uri: Uri): String {
@@ -225,7 +284,7 @@ object FileSystemScanner {
     private fun queryMediaStoreDownloadsUnrestricted(
         context: Context,
         onStatus: (String) -> Unit,
-        onScan: (String, ByteArray) -> Unit,
+        onScan: (String, ByteArray, String) -> Unit,
     ) {
         val resolver = context.contentResolver
         val projection = arrayOf(MediaStore.Downloads._ID, MediaStore.Downloads.DISPLAY_NAME)
@@ -249,11 +308,11 @@ object FileSystemScanner {
                 if (++count > 2000) break
                 val name = it.getString(nameIdx) ?: continue
                 val ext = name.substringAfterLast('.', "").lowercase()
-                if (ext !in TEXT_EXTENSIONS) continue
+                if (ext !in TEXT_EXTENSIONS && ext !in ARCHIVE_EXTENSIONS) continue
                 val id = it.getLong(idIdx)
                 val uri = ContentUris.withAppendedId(MediaStore.Downloads.EXTERNAL_CONTENT_URI, id)
                 onStatus(name)
-                readUri(context, uri)?.let { bytes -> onScan("Download/$name", bytes) }
+                readUri(context, uri)?.let { bytes -> onScan("Download/$name", bytes, ext) }
             }
         }
     }

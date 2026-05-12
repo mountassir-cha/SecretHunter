@@ -9,4 +9,8 @@
         android:id="@+id/action_pick_file"
         android:title="@string/menu_pick_file"
         app:showAsAction="never" />
+    <item
+        android:id="@+id/action_pick_apk"
+        android:title="@string/menu_pick_apk"
+        app:showAsAction="never" />
 </menu>

@@ -81,7 +81,15 @@ class MainActivity : AppCompatActivity() {
                         "application/json",
                         "application/xml",
                         "application/octet-stream",
+                        "application/vnd.android.package-archive",
+                        "application/zip",
                         "*/*",
+                    ),
+                )
+                R.id.action_pick_apk -> openDocumentLauncher.launch(
+                    arrayOf(
+                        "application/vnd.android.package-archive",
+                        "application/zip"
                     ),
                 )
                 else -> return@setOnMenuItemClickListener false

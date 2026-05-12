@@ -19,6 +19,7 @@
     <string name="real_test_installed">Fichier de test installé dans l’app. Scan en cours…</string>
     <string name="real_test_copy_failed">Impossible d’installer le fichier de test.</string>
     <string name="menu_pick_file">Choisir un fichier à analyser…</string>
+    <string name="menu_pick_apk">Analyser un APK…</string>
     <string name="pick_file_cancelled">Aucun fichier sélectionné.</string>
     <string name="pick_file_read_failed">Impossible de lire ce fichier.</string>
 </resources>
