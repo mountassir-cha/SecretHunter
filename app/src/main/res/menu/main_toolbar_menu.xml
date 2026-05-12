@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/action_real_test"
+        android:title="@string/menu_real_test"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_pick_file"
+        android:title="@string/menu_pick_file"
+        app:showAsAction="never" />
+</menu>

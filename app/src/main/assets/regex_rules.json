@@ -1,0 +1,79 @@
+[
+  {
+    "id": "jwt",
+    "name": "JWT",
+    "category": "TOKEN",
+    "severity": "CRITICAL",
+    "pattern": "eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}"
+  },
+  {
+    "id": "aws_access_key",
+    "name": "Clé d'accès AWS",
+    "category": "CLOUD",
+    "severity": "CRITICAL",
+    "pattern": "(?:AKIA|ASIA)[0-9A-Z]{16}"
+  },
+  {
+    "id": "aws_secret_key",
+    "name": "Secret AWS (base64 40)",
+    "category": "CLOUD",
+    "severity": "CRITICAL",
+    "pattern": "aws_secret_access_key\\s*[=:]\\s*['\"]?([A-Za-z0-9/+=]{40})['\"]?"
+  },
+  {
+    "id": "generic_api_key",
+    "name": "Clé API (sk-/pk-)",
+    "category": "API_KEY",
+    "severity": "HIGH",
+    "pattern": "\\b(sk|pk)_(live|test)_[0-9a-zA-Z]{20,}\\b"
+  },
+  {
+    "id": "hex_api_key",
+    "name": "Clé hex longue",
+    "category": "API_KEY",
+    "severity": "MEDIUM",
+    "pattern": "\\b(api[_-]?key|apikey|token|secret)\\s*[=:]\\s*['\"]?([0-9a-fA-F]{32,64})['\"]?"
+  },
+  {
+    "id": "bearer_token",
+    "name": "Bearer token",
+    "category": "TOKEN",
+    "severity": "HIGH",
+    "pattern": "(?i)bearer\\s+[A-Za-z0-9._~+/=-]{20,}"
+  },
+  {
+    "id": "password_assignment",
+    "name": "Mot de passe en clair",
+    "category": "PASSWORD",
+    "severity": "HIGH",
+    "pattern": "(?i)(password|passwd|pwd)\\s*[=:]\\s*['\"]([^'\"\\s]{6,})['\"]"
+  },
+  {
+    "id": "email",
+    "name": "Email",
+    "category": "PII",
+    "severity": "LOW",
+    "pattern": "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"
+  },
+  {
+    "id": "phone_fr",
+    "name": "Téléphone (FR)",
+    "category": "PII",
+    "severity": "MEDIUM",
+    "pattern": "(?:\\+33|0)\\s*[1-9](?:[\\s.-]?\\d{2}){4}"
+  },
+  {
+    "id": "github_pat",
+    "name": "GitHub token",
+    "category": "TOKEN",
+    "severity": "CRITICAL",
+    "pattern": "gh[pousr]_[A-Za-z0-9_]{20,}"
+  },
+  {
+    "id": "slack_token",
+    "name": "Slack token",
+    "category": "TOKEN",
+    "severity": "HIGH",
+    "pattern": "xox[baprs]-[A-Za-z0-9-]{10,}"
+  }
+]

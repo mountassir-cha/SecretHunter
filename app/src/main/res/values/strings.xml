@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SecretHunter</string>
+    <string name="nav_scan">Scanner</string>
+    <string name="nav_results">Résultats</string>
+    <string name="nav_about">À propos</string>
+    <string name="scan_button">Lancer le scan</string>
+    <string name="scanning">Analyse en cours…</string>
+    <string name="scan_complete">Scan terminé</string>
+    <string name="empty_state">Aucun secret détecté. Lancez un scan.</string>
+    <string name="permission_rationale">SecretHunter a besoin d\'accéder aux fichiers autorisés (images, médias, téléchargements) pour détecter d\'éventuelles fuites locales.</string>
+    <string name="about_text">SecretHunter analyse les fichiers accessibles par l\'application pour repérer des motifs sensibles (regex). Les résultats sont stockés localement sur l\'appareil.</string>
+    <string name="secret_meta_format">Ligne %1$d · %2$s</string>
+    <string name="scanning_file">Analyse : %1$s</string>
+    <string name="scan_summary">Scan terminé — %1$d correspondance(s)</string>
+    <string name="permissions_granted_hint">Accès aux médias accordé.</string>
+    <string name="permissions_denied_hint">Certaines zones du stockage ne seront pas analysées.</string>
+    <string name="menu_real_test">Test réel (fichier local)</string>
+    <string name="real_test_installed">Fichier de test installé dans l’app. Scan en cours…</string>
+    <string name="real_test_copy_failed">Impossible d’installer le fichier de test.</string>
+    <string name="menu_pick_file">Choisir un fichier à analyser…</string>
+    <string name="pick_file_cancelled">Aucun fichier sélectionné.</string>
+    <string name="pick_file_read_failed">Impossible de lire ce fichier.</string>
+</resources>
